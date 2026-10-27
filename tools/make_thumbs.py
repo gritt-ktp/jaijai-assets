@@ -1,6 +1,7 @@
 """Build small product thumbnails for the นายน้อย LINE bot.
 
-Reads product/_sources.csv (code,url), downloads each photo, fits it on a
+Reads product/_sources.csv (code,url) — every produced item (Master Bom BOM No_),
+url = its Pic link from Master FG Pic or blank. Downloads each photo, fits it on a
 white 240x240 square canvas and saves product/<CODE>.jpg (~10-20 KB).
 Existing thumbnails are skipped unless FORCE=1.
 Failures are written to product/_failed.csv.
@@ -86,6 +87,9 @@ def make(code, url):
     # skip finished thumbnails; codes that were placeholders last time are retried
     if os.path.exists(out) and not FORCE and code not in PREV_FAILED:
         return code, "skip", ""
+    if not url:
+        placeholder(out)           # item has no photo in Master FG Pic → grey placeholder
+        return code, "fail", "no photo link in Master FG Pic"
     try:
         img = Image.open(io.BytesIO(fetch(url)))
         img = ImageOps.exif_transpose(img)
