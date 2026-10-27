@@ -11,6 +11,10 @@ on:
         description: "Only the first N products (0 = all) — for test runs"
         type: number
         default: 0
+      codes:
+        description: "Only these product codes, comma-separated (blank = all)"
+        type: string
+        default: ""
   push:
     paths:
       - "product/_sources.csv"
@@ -41,6 +45,7 @@ jobs:
         env:
           FORCE: ${{ inputs.force && '1' || '' }}
           LIMIT: ${{ inputs.limit || 0 }}
+          CODES: ${{ inputs.codes }}
           PYTHONUNBUFFERED: "1"
         run: python tools/make_thumbs.py
 

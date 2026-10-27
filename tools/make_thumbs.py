@@ -22,6 +22,7 @@ SRC = os.path.join(ROOT, "_sources.csv")
 FAILED = os.path.join(ROOT, "_failed.csv")
 FORCE = os.environ.get("FORCE") == "1"
 LIMIT = int(os.environ.get("LIMIT") or 0)          # >0 = only first N rows (test runs)
+CODES = {c.strip().upper() for c in os.environ.get("CODES", "").split(",") if c.strip()}
 TIMEOUT = (8, 20)                                  # connect, read seconds
 PROXY = "https://images.weserv.nl/?url="          # fallback when gammaco.com is slow/blocked
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -41,18 +42,24 @@ def _get(url, **kw):
 
 
 def fetch(url):
+    errs = []
     try:
         return _get(url)
-    except requests.exceptions.SSLError:
+    except requests.exceptions.SSLError as e:
+        errs.append(f"direct SSL: {e}")
         # gammaco.com may serve an incomplete certificate chain; these are public photos
         try:
             return _get(url, verify=False)
-        except Exception:  # noqa: BLE001
-            pass
-    except Exception:  # noqa: BLE001
-        pass
+        except Exception as e2:  # noqa: BLE001
+            errs.append(f"direct no-verify: {type(e2).__name__}: {e2}")
+    except Exception as e:  # noqa: BLE001
+        errs.append(f"direct: {type(e).__name__}: {e}")
     # direct download failed or timed out → same photo through the image proxy
-    return _get(PROXY + quote(url, safe=""))
+    try:
+        return _get(PROXY + quote(url, safe=""))
+    except Exception as e:  # noqa: BLE001
+        errs.append(f"proxy: {type(e).__name__}: {e}")
+    raise RuntimeError(" | ".join(errs))
 
 
 def make(code, url):
@@ -81,6 +88,8 @@ def make(code, url):
 def main():
     with open(SRC, newline="", encoding="utf-8") as f:
         rows = [(r["code"].strip().upper(), r["url"].strip()) for r in csv.DictReader(f)]
+    if CODES:
+        rows = [r for r in rows if r[0] in CODES]
     if LIMIT:
         rows = rows[:LIMIT]
     done = [0]
