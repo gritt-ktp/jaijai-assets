@@ -103,6 +103,10 @@ def main():
     print(f"made {ok}, skipped {skip}, failed {len(fails)} of {len(rows)}")
     for c, e in fails[:20]:
         print("  FAIL", c, e)
+    # GitHub annotations: visible on the run page (and via the API) without opening logs
+    for c, e in fails[:5]:
+        print(f"::warning title=thumb {c}::{e[:300]}")
+    print(f"::notice title=thumbs::made {ok}, skipped {skip}, failed {len(fails)} of {len(rows)}")
     # don't fail the job for a few broken photos; fail only if nothing worked
     if rows and ok + skip == 0:
         sys.exit(1)
