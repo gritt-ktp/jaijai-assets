@@ -1,0 +1,57 @@
+name: Build product thumbnails
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild every thumbnail (not only new ones)"
+        type: boolean
+        default: false
+  push:
+    paths:
+      - "product/_sources.csv"
+      - "tools/make_thumbs.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: thumbs
+  cancel-in-progress: false
+
+jobs:
+  thumbs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install pillow requests
+
+      - name: Make thumbnails
+        env:
+          FORCE: ${{ inputs.force && '1' || '' }}
+        run: python tools/make_thumbs.py
+
+      - name: Commit
+        run: |
+          git config user.name  "thumbs-bot"
+          git config user.email "thumbs-bot@users.noreply.github.com"
+          git add product
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update product thumbnails"
+            git push
+          fi
+
+      - name: Refresh jsDelivr branch cache
+        # jsDelivr remembers which commit "@main" points to for up to 12 h;
+        # purging one file makes it pick up the new commit so new thumbnails don't 404.
+        run: |
+          curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/product/_sources.csv" || true
