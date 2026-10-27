@@ -66,3 +66,12 @@ jobs:
         # purging one file makes it pick up the new commit so new thumbnails don't 404.
         run: |
           curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/product/_sources.csv" || true
+
+      - name: Check CDN
+        run: |
+          sleep 20
+          for c in 2014520 2010361 3090035; do
+            r=$(curl -s -o /dev/null -w '%{http_code} %{content_type} %{size_download}B %{time_total}s' \
+                "https://cdn.jsdelivr.net/gh/${{ github.repository }}@main/product/$c.jpg")
+            echo "::notice title=cdn $c::$r"
+          done
