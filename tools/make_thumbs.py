@@ -62,9 +62,29 @@ def fetch(url):
     raise RuntimeError(" | ".join(errs))
 
 
+ICON = os.path.join(ROOT, "..", "package.png")
+PREV_FAILED = set()
+if os.path.exists(FAILED):
+    with open(FAILED, newline="", encoding="utf-8") as f:
+        PREV_FAILED = {r["code"].strip().upper() for r in csv.DictReader(f)}
+
+
+def placeholder(out):
+    """Light-grey square with the package icon — shown when the website has no photo."""
+    canvas = Image.new("RGB", (W, H), (241, 241, 241))
+    try:
+        icon = Image.open(ICON).convert("RGBA")
+        icon.thumbnail((W // 3, H // 3), Image.LANCZOS)
+        canvas.paste(icon, ((W - icon.width) // 2, (H - icon.height) // 2), icon)
+    except Exception:  # noqa: BLE001
+        pass
+    canvas.save(out, "JPEG", quality=80, optimize=True)
+
+
 def make(code, url):
     out = os.path.join(ROOT, f"{code}.jpg")
-    if os.path.exists(out) and not FORCE:
+    # skip finished thumbnails; codes that were placeholders last time are retried
+    if os.path.exists(out) and not FORCE and code not in PREV_FAILED:
         return code, "skip", ""
     try:
         img = Image.open(io.BytesIO(fetch(url)))
@@ -82,6 +102,7 @@ def make(code, url):
         canvas.save(out, "JPEG", quality=80, optimize=True, progressive=True)
         return code, "ok", ""
     except Exception as e:  # noqa: BLE001
+        placeholder(out)           # never leave the bot with a missing file
         return code, "fail", f"{type(e).__name__}: {e}"
 
 
