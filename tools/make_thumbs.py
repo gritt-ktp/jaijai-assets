@@ -1,7 +1,7 @@
 """Build small product thumbnails for the นายน้อย LINE bot.
 
 Reads product/_sources.csv (code,url) — every produced item (Master Bom BOM No_),
-url = its Pic link from Master FG Pic or blank. Downloads each photo, fits it on a
+url = its Pic link from Master FG Pic or blank ("No photo" placeholder). Downloads each photo, fits it on a
 white 240x240 square canvas and saves product/<CODE>.jpg (~10-20 KB).
 Existing thumbnails are skipped unless FORCE=1.
 Failures are written to product/_failed.csv.
@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from urllib.parse import quote
-from PIL import Image, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 W, H = 240, 240
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "product")
@@ -70,16 +70,23 @@ if os.path.exists(FAILED):
         PREV_FAILED = {r["code"].strip().upper() for r in csv.DictReader(f)}
 
 
+def _font(size):
+    for f in ("DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+              "LiberationSans-Regular.ttf", "Arial.ttf"):
+        try:
+            return ImageFont.truetype(f, size)
+        except Exception:  # noqa: BLE001
+            continue
+    return ImageFont.load_default(size=size)
+
+
 def placeholder(out):
-    """Light-grey square with the package icon — shown when the website has no photo."""
-    canvas = Image.new("RGB", (W, H), (241, 241, 241))
-    try:
-        icon = Image.open(ICON).convert("RGBA")
-        icon.thumbnail((W // 3, H // 3), Image.LANCZOS)
-        canvas.paste(icon, ((W - icon.width) // 2, (H - icon.height) // 2), icon)
-    except Exception:  # noqa: BLE001
-        pass
-    canvas.save(out, "JPEG", quality=80, optimize=True)
+    """White square with grey "No photo" in the centre — shown when there is no photo.
+    White matches the bot's photo frame, so the card reads as an empty frame with the label."""
+    canvas = Image.new("RGB", (W, H), "white")
+    d = ImageDraw.Draw(canvas)
+    d.text((W / 2, H / 2), "No photo", fill=(154, 154, 154), font=_font(30), anchor="mm")
+    canvas.save(out, "JPEG", quality=85, optimize=True)
 
 
 def make(code, url):
